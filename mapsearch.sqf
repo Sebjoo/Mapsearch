@@ -1,23 +1,22 @@
 /*
 ====================================================================
-    MAPMARKER SEARCH - CONFIGURATION
+    MAPMARKER SEARCH - CONFIG
 ====================================================================
 */
 
-// 1. Map Locations (Fetches cities and villages directly from the worldCfg)
+// Map Locations (Fetches cities and villages directly from the worldCfg)
 MapSearch_UseWorldCFG = true;
 
-// 2. Map Markers (Fetches markers placed in the Eden Editor or via scripts)
+// Map Markers (Fetches markers placed in the Eden Editor or via scripts)
 MapSearch_UseMapMarkers = true;
 MapSearch_IgnoreUserMarkers = true; // Ignores markers drawn on the map by players
 MapSearch_IgnoreInvisible = true;   // Ignores markers with an alpha value of 0 (invisible)
 
-// 3. Costum Locations
+// Custom Locations
 MapSearch_UseCustomLocations = false;
 
 /*
-Custom Locations List
-Format: ["Location Name", [X, Y, Z]]
+Custom Locations List ["Location Name", [X, Y, Z]]
 */
 MapSearch_CustomLocationsList = [
     ["Athira", [14000, 18900, 0]],
@@ -53,19 +52,43 @@ if (isNil "MapSearch_Draw3DEH") then {
     }];
 };
 
+MapSearch_fnc_Zoom = {
+    params ["_dataString"];
+    if (_dataString != "") then {
+        playSound "Click"; 
+        private _dataArr = parseSimpleArray _dataString; 
+        private _pos = _dataArr select 0;
+        private _name = _dataArr select 1;
+
+        private _edit = uiNamespace getVariable ["MapSearch_CtrlEdit", controlNull];
+        if (!isNull _edit) then { _edit ctrlSetText _name; };
+
+        MapSearch_LastPos = _pos; 
+        private _mapCtrl = (findDisplay 12) displayCtrl 51;
+        _mapCtrl ctrlMapAnimAdd [1, 0.05, _pos]; 
+        ctrlMapAnimCommit _mapCtrl;
+
+        private _list = uiNamespace getVariable ["MapSearch_CtrlList", controlNull];
+        if (!isNull _list) then { _list ctrlShow false; };
+    };
+};
+uiNamespace setVariable ["MapSearch_fnc_Zoom", MapSearch_fnc_Zoom];
+
 MapSearch_StaticLocations = [];
 
 if (MapSearch_UseWorldCFG) then {
     private _locTypes = ["NameCityCapital", "NameCity", "NameVillage", "NameLocal", "NameMarine"];
     private _worldLocs = nearestLocations [[worldSize/2, worldSize/2, 0], _locTypes, worldSize];
     {
-        MapSearch_StaticLocations pushBack [text _x, locationPosition _x];
+        private _name = text _x;
+        MapSearch_StaticLocations pushBack [_name, locationPosition _x, toLower _name];
     } forEach _worldLocs;
 };
 
 if (MapSearch_UseCustomLocations) then {
     {
-        MapSearch_StaticLocations pushBack _x;
+        _x params ["_name", "_pos"];
+        MapSearch_StaticLocations pushBack [_name, _pos, toLower _name];
     } forEach MapSearch_CustomLocationsList;
 };
 
@@ -160,34 +183,12 @@ addMissionEventHandler ["Map", {
                         if (MapSearch_IgnoreUserMarkers && _isUser) then { _add = false; };
                         
                         if (_add) then {
-                            _currentLocations pushBack [_mText, markerPos _x];
+                            _currentLocations pushBack [_mText, markerPos _x, toLower _mText];
                         };
                     };
                 } forEach allMapMarkers;
             };
             uiNamespace setVariable ["MapSearch_CurrentLocations", _currentLocations];
-
-            private _fnc_executeZoom = {
-                params ["_dataString"];
-                if (_dataString != "") then {
-                    playSound "Click"; 
-                    private _dataArr = parseSimpleArray _dataString; 
-                    private _pos = _dataArr select 0;
-                    private _name = _dataArr select 1;
-
-                    private _edit = uiNamespace getVariable ["MapSearch_CtrlEdit", controlNull];
-                    _edit ctrlSetText _name;
-
-                    MapSearch_LastPos = _pos; 
-                    private _mapCtrl = (findDisplay 12) displayCtrl 51;
-                    _mapCtrl ctrlMapAnimAdd [1, 0.05, _pos]; 
-                    ctrlMapAnimCommit _mapCtrl;
-
-                    private _list = uiNamespace getVariable ["MapSearch_CtrlList", controlNull];
-                    _list ctrlShow false; 
-                };
-            };
-            uiNamespace setVariable ["MapSearch_fnc_Zoom", _fnc_executeZoom];
 
             _btnX ctrlAddEventHandler ["ButtonClick", {
                 playSound "Click"; 
@@ -225,8 +226,8 @@ addMissionEventHandler ["Map", {
                 private _locsToSearch = uiNamespace getVariable ["MapSearch_CurrentLocations", []];
                 
                 {
-                    _x params ["_name", "_pos"];
-                    if ((toLower _name) find _text >= 0) then {
+                    _x params ["_name", "_pos", "_nameLower"];
+                    if (_nameLower find _text >= 0) then {
                         _matches pushBack [player distance2D _pos, _name, _pos];
                     };
                 } forEach _locsToSearch;
